@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ta">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#7b3f28">
+  <meta name="description" content="விசேஷங்களுக்கான மொய் கணக்கு — இணையமின்றியும் இயங்கும்">
+  <title>MOI Ledger | மொய் கணக்கு</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="lock-screen" class="lock-screen hidden">
+    <form id="unlock-form" class="lock-card">
+      <div class="brand-mark">மொய்</div>
+      <h1 data-i18n="appTitle">மொய் கணக்கு</h1>
+      <label for="unlock-pin" data-i18n="enterPin">4 இலக்க PIN உள்ளிடவும்</label>
+      <input id="unlock-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="current-password">
+      <button class="primary wide" data-i18n="unlock">திறக்கவும்</button>
+      <p id="unlock-error" class="form-error" role="alert"></p>
+    </form>
+  </div>
+  <header class="topbar">
+    <a class="brand" href="#" data-screen-link="events" aria-label="MOI Ledger home">
+      <span class="brand-mark">மொய்</span>
+      <span><strong data-i18n="appTitle">மொய் கணக்கு</strong><small>MOI LEDGER</small></span>
+    </a>
+    <div class="top-actions">
+      <button id="quick-language" class="icon-button" type="button" aria-label="Change language">EN</button>
+      <button id="install-button" class="icon-button hidden" type="button" data-i18n="install">நிறுவு</button>
+    </div>
+  </header>
+  <main id="app" class="main-content" aria-live="polite"></main>
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button type="button" data-screen="events" class="active"><span>🏠</span><small data-i18n="events">விசேஷம்</small></button>
+    <button type="button" data-screen="entry"><span>✍️</span><small data-i18n="entry">வரவு</small></button>
+    <button type="button" data-screen="balance"><span>⚖️</span><small data-i18n="balance">இருப்பு</small></button>
+    <button type="button" data-screen="villages"><span>🛣️</span><small data-i18n="villages">ஊர்கள்</small></button>
+    <button type="button" data-screen="settings"><span>⚙️</span><small data-i18n="settings">அமைப்பு</small></button>
+  </nav>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <datalist id="village-options"></datalist>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
