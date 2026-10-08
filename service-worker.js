@@ -1,7 +1,8 @@
-const CACHE_NAME = "moi-ledger-v1";
+const CACHE_NAME = "moi-ledger-v3";
 const APP_SHELL = [
   "./", "./index.html", "./style.css", "./app.js", "./db.js", "./i18n.js",
-  "./manifest.json", "./icons/icon.svg", "./icons/icon-192.png", "./icons/icon-512.png"
+  "./firebase.js", "./firebase-config.js", "./manifest.json", "./icons/icon.svg",
+  "./icons/icon-192.png", "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", event => {
@@ -17,14 +18,22 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  if (event.request.method !== "GET" || new URL(event.request.url).origin !== self.location.origin) return;
+  if (event.request.method !== "GET") return;
+  const requestUrl = new URL(event.request.url);
+  const appRequest = requestUrl.origin === self.location.origin;
+  const firebaseSdkRequest = requestUrl.origin === "https://www.gstatic.com"
+    && requestUrl.pathname.startsWith("/firebasejs/");
+  if (!appRequest && !firebaseSdkRequest) return;
   event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request).then(response => {
-      if (response.ok) {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-      }
-      return response;
-    }))
+    caches.match(event.request).then(cached => {
+      if (cached) return cached;
+      return fetch(event.request).then(response => {
+        if (response.ok || response.type === "opaque") {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      });
+    })
   );
 });

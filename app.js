@@ -1,9 +1,10 @@
-import { getAll, get, put, remove, replaceAll, bulkPut } from "./db.js";
+import { getAll, get, put, remove, replaceAll, bulkPut, getDeletes, clearDelete } from "./db.js";
 import { translate } from "./i18n.js";
+import { isFirebaseConfigured, observeAuth, createAccount, signIn, sendPasswordReset, signOut as firebaseSignOut, syncAccount } from "./firebase.js";
 
 const STORE_NAMES = ["events", "received", "given", "routes", "settings"];
 const app = document.querySelector("#app");
-const state = { screen: "events", language: "ta", currency: "₹", theme: "light", activeEventId: null, data: {}, installPrompt: null, draggedVillage: null };
+const state = { screen: "events", language: "ta", currency: "₹", theme: "light", activeEventId: null, data: {}, installPrompt: null, draggedVillage: null, authUser: null, authMode: "signin", authError: "", authBusy: false, syncStatus: "", syncBusy: false };
 
 const t = key => translate(key, state.language);
 const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
@@ -44,7 +45,124 @@ function setScreen(screen) {
 async function refresh(focusName = false) {
   await loadData();
   render();
+  scheduleCloudSync();
   if (focusName) document.querySelector("#person-name")?.focus();
+}
+
+let syncTimer;
+let syncAgain = false;
+function scheduleCloudSync(delay = 700) {
+  if (!state.authUser) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => runCloudSync(), delay);
+}
+
+async function runCloudSync() {
+  if (!state.authUser) return;
+  if (state.syncBusy) { syncAgain = true; return; }
+  if (!navigator.onLine) {
+    state.syncStatus = t("syncOffline");
+    updateAccountHeader();
+    return;
+  }
+  state.syncBusy = true;
+  state.syncStatus = t("syncPending");
+  updateAccountHeader();
+  try {
+    await syncAccount(state.authUser.uid, { getAll, put, remove, getDeletes, clearDelete });
+    await loadData();
+    await loadSettings();
+    state.syncStatus = t("syncReady");
+    render();
+  } catch (error) {
+    console.error("Cloud sync failed", error);
+    state.syncStatus = navigator.onLine ? `${t("error")}: ${error.message}` : t("syncOffline");
+    updateAccountHeader();
+  } finally {
+    state.syncBusy = false;
+    if (syncAgain) {
+      syncAgain = false;
+      scheduleCloudSync(0);
+    }
+  }
+}
+
+function renderAuthGate() {
+  const gate = document.querySelector("#auth-gate");
+  const configured = isFirebaseConfigured();
+  const setupMessage = !configured ? t("firebaseSetup") : "";
+  const errorMessage = state.authError;
+  const message = errorMessage || setupMessage;
+  gate.innerHTML = `<section class="auth-card">
+    <div class="auth-links"><span></span><button class="text-button" type="button" data-auth-action="language">${state.language === "ta" ? "EN" : "தமிழ்"}</button></div>
+    <div class="brand-mark">மொய்</div>
+    <h1 id="auth-title">${t("appTitle")}</h1>
+    <p class="hint">${t("authRequired")}</p>
+    <p class="auth-status ${errorMessage ? "error" : ""}" role="status">${escapeHtml(message || t("localOnly"))}</p>
+    ${configured ? `<form id="auth-form">
+      <div class="field"><label for="auth-email">${t("email")}</label><input id="auth-email" name="email" type="email" required autocomplete="email"></div>
+      <div class="field"><label for="auth-password">${t("password")}</label><input id="auth-password" name="password" type="password" required minlength="6" autocomplete="${state.authMode === "signup" ? "new-password" : "current-password"}"></div>
+      <button class="primary wide" type="submit" ${state.authBusy ? "disabled" : ""}>${state.authMode === "signup" ? t("createAccount") : t("login")}</button>
+      <div class="auth-links"><button class="text-button" type="button" data-auth-action="toggle">${state.authMode === "signup" ? t("login") : t("createAccount")}</button>
+      ${state.authMode === "signup" ? "" : `<button class="text-button" type="button" data-auth-action="reset">${t("forgotPassword")}</button>`}</div>
+    </form>` : ""}
+  </section>`;
+  gate.classList.remove("hidden");
+}
+
+function updateAccountHeader() {
+  const email = document.querySelector("#account-email");
+  const logout = document.querySelector("#sign-out-button");
+  email.textContent = state.authUser ? `${state.authUser.email || ""}${state.syncStatus ? ` · ${state.syncStatus}` : ""}` : "";
+  email.classList.toggle("hidden", !state.authUser);
+  logout.classList.toggle("hidden", !state.authUser);
+}
+
+function firebaseErrorMessage(error) {
+  const messages = {
+    "auth/email-already-in-use": "authEmailExists",
+    "auth/invalid-credential": "authWrongPassword",
+    "auth/wrong-password": "authWrongPassword",
+    "auth/invalid-email": "authInvalidEmail",
+    "auth/weak-password": "authWeakPassword",
+    "auth/network-request-failed": "authNetwork"
+  };
+  return `${t(messages[error.code] || "authError")}${messages[error.code] ? "" : ` (${error.code || error.message})`}`;
+}
+
+async function onAuthChanged(user) {
+  if (!user) {
+    state.authUser = null;
+    document.querySelector("#lock-screen").classList.add("hidden");
+    updateAccountHeader();
+    renderAuthGate();
+    return;
+  }
+  const owner = await get("settings", "cloudOwnerUid");
+  if (owner?.value && owner.value !== user.uid) {
+    state.authError = t("accountMismatch");
+    await firebaseSignOut();
+    return;
+  }
+  if (!owner?.value) {
+    const localCount = ["events", "received", "given", "routes"].reduce((count, store) => count + state.data[store].length, 0);
+    if (localCount && !window.confirm(t("adoptData"))) {
+      state.authError = t("authRequired");
+      await firebaseSignOut();
+      return;
+    }
+    await put("settings", { key: "cloudOwnerUid", value: user.uid });
+  }
+  state.authError = "";
+  state.authUser = user;
+  document.querySelector("#auth-gate").classList.add("hidden");
+  updateAccountHeader();
+  await loadData();
+  await loadSettings();
+  const pin = await get("settings", "pin");
+  if (pin?.value) document.querySelector("#lock-screen").classList.remove("hidden");
+  render();
+  scheduleCloudSync(0);
 }
 
 function pageHeading(title, hint = "") {
@@ -254,13 +372,13 @@ function settingsPage() {
       <div class="field"><label>${t("theme")}</label><select id="theme-setting"><option value="light" ${state.theme === "light" ? "selected" : ""}>${t("light")}</option><option value="dark" ${state.theme === "dark" ? "selected" : ""}>${t("dark")}</option></select></div>
       <div class="field"><label>${t("pin")}</label><div class="actions"><button class="secondary" data-action="set-pin">${t("setPin")}</button><button class="danger-button" data-action="remove-pin">${t("removePin")}</button></div><small class="hint">${t("pinHelp")}</small></div>
     </section>
-    <section class="card"><h2>${t("backup")}</h2><p class="hint">${state.language === "ta" ? "உங்கள் தரவு இந்தச் சாதனத்திலேயே சேமிக்கப்படுகிறது." : "Your data is stored on this device."}</p>
+    <section class="card"><h2>${t("backup")}</h2><p class="hint">${t("localOnly")}</p>
       <div class="actions"><button class="primary" data-action="backup">${t("backup")}</button><label class="secondary">${t("restore")}<input id="restore-file" type="file" accept=".json,application/json" hidden></label></div>
     </section>
     <section class="card"><h2>${t("importCsv")}</h2><p class="hint">${t("importHelp")}</p>
       <div class="actions"><label class="secondary">${t("importCsv")}<input id="import-file" type="file" accept=".csv,text/csv" hidden></label><button class="secondary" data-action="lock-now">${t("lockNow")}</button></div>
     </section>
-    <p class="hint">MOI Ledger · ${state.language === "ta" ? "தரவு உங்கள் உலாவியில் மட்டும் இருக்கும்." : "Your data stays in this browser."}</p>`;
+    <p class="hint">MOI Ledger · ${t("localOnly")}</p>`;
 }
 
 function render() {
@@ -274,6 +392,7 @@ function render() {
     : state.screen === "villages" ? villagesPage()
     : settingsPage();
   document.querySelectorAll(".bottom-nav [data-screen]").forEach(button => button.classList.toggle("active", button.dataset.screen === state.screen));
+  updateAccountHeader();
 }
 
 function toast(message, error = false) {
@@ -411,6 +530,13 @@ async function restoreBackup(file) {
     throw new Error(state.language === "ta" ? "சரியான மொய் கணக்கு காப்புப்பிரதி இல்லை." : "This is not a valid MOI Ledger backup.");
   }
   if (!window.confirm(state.language === "ta" ? "தற்போதைய பதிவுகள் அனைத்தும் மாற்றப்படும். தொடரவா?" : "All current records will be replaced. Continue?")) return;
+  const localSettings = await getAll("settings");
+  const restoredSettings = source.settings.filter(setting => !["pin", "cloudOwnerUid"].includes(setting.key));
+  for (const key of ["pin", "cloudOwnerUid"]) {
+    const existing = localSettings.find(setting => setting.key === key);
+    if (existing && !restoredSettings.some(setting => setting.key === key)) restoredSettings.push(existing);
+  }
+  source.settings = restoredSettings;
   await replaceAll(source);
   state.activeEventId = null;
   await loadData();
@@ -422,6 +548,7 @@ async function restoreBackup(file) {
 async function saveSetting(key, value) {
   await put("settings", { key, value });
   state[key] = value;
+  scheduleCloudSync();
 }
 
 async function loadSettings() {
@@ -440,6 +567,42 @@ async function deleteRecord(store, id) {
 }
 
 document.addEventListener("click", async event => {
+  const authAction = event.target.closest("[data-auth-action]");
+  if (authAction) {
+    if (authAction.dataset.authAction === "language") {
+      state.language = state.language === "ta" ? "en" : "ta";
+      await saveSetting("language", state.language);
+      renderAuthGate();
+      render();
+    }
+    if (authAction.dataset.authAction === "toggle") {
+      state.authMode = state.authMode === "signin" ? "signup" : "signin";
+      state.authError = "";
+      renderAuthGate();
+    }
+    if (authAction.dataset.authAction === "reset") {
+      const email = document.querySelector("#auth-email")?.value.trim();
+      if (!email) { state.authError = t("authInvalidEmail"); renderAuthGate(); return; }
+      try {
+        await sendPasswordReset(email);
+        state.authError = t("resetSent");
+      } catch (error) {
+        state.authError = firebaseErrorMessage(error);
+      }
+      renderAuthGate();
+    }
+    return;
+  }
+  if (event.target.closest("#sign-out-button")) {
+    try {
+      state.authError = "";
+      await firebaseSignOut();
+    } catch (error) {
+      state.authError = firebaseErrorMessage(error);
+      renderAuthGate();
+    }
+    return;
+  }
   const nav = event.target.closest("[data-screen]");
   if (nav && nav.dataset.screen) return setScreen(nav.dataset.screen);
   const close = event.target.closest("[data-close-dialog]");
@@ -572,6 +735,23 @@ document.addEventListener("submit", async event => {
   event.preventDefault();
   try {
     const form = event.target;
+    if (form.getAttribute("id") === "auth-form") {
+      const email = form.elements.email.value.trim();
+      const password = form.elements.password.value;
+      state.authBusy = true;
+      state.authError = "";
+      renderAuthGate();
+      try {
+        if (state.authMode === "signup") await createAccount(email, password);
+        else await signIn(email, password);
+      } catch (error) {
+        state.authError = firebaseErrorMessage(error);
+      } finally {
+        state.authBusy = false;
+        if (!state.authUser) renderAuthGate();
+      }
+      return;
+    }
     const values = Object.fromEntries(new FormData(form).entries());
     if (form.getAttribute("id") === "event-form") {
       if (!values.name.trim()) return toast(t("enterRequired"), true);
@@ -683,21 +863,59 @@ document.querySelector("#install-button").addEventListener("click", async () => 
   document.querySelector("#install-button").classList.add("hidden");
 });
 
+async function prepareOfflineSupport() {
+  if (!("serviceWorker" in navigator) || !(location.protocol === "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname))) return;
+  try {
+    await navigator.serviceWorker.register("./service-worker.js");
+    await Promise.race([navigator.serviceWorker.ready, new Promise(resolve => setTimeout(resolve, 4000))]);
+    if (!navigator.serviceWorker.controller) {
+      await Promise.race([
+        new Promise(resolve => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })),
+        new Promise(resolve => setTimeout(resolve, 1500))
+      ]);
+    }
+  } catch (error) {
+    console.error("Offline support could not be registered", error);
+  }
+}
+
 async function start() {
+  renderAuthGate();
   try {
     if (!("indexedDB" in window)) throw new Error("IndexedDB is unavailable in this browser");
     await loadData();
     await loadSettings();
     render();
-    const pin = await get("settings", "pin");
-    if (pin?.value) document.querySelector("#lock-screen").classList.remove("hidden");
-    if ("serviceWorker" in navigator && (location.protocol === "https:" || ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname))) {
-      navigator.serviceWorker.register("./service-worker.js").catch(error => console.error("Offline support could not be registered", error));
-    }
+    renderAuthGate();
+    await prepareOfflineSupport();
+    await observeAuth(
+      user => onAuthChanged(user).catch(error => {
+        console.error("Authentication state could not be loaded", error);
+        state.authError = firebaseErrorMessage(error);
+        renderAuthGate();
+      }),
+      error => {
+        console.error("Firebase authentication could not start", error);
+        state.authError = firebaseErrorMessage(error);
+        renderAuthGate();
+      }
+    );
   } catch (error) {
     console.error(error);
-    app.innerHTML = `<section class="card"><h1>${t("error")}</h1><p>${escapeHtml(error.message)}</p></section>`;
+    state.authError = error.message.includes("Firebase is not configured") ? t("firebaseSetup") : firebaseErrorMessage(error);
+    renderAuthGate();
   }
 }
+
+window.addEventListener("online", () => scheduleCloudSync(0));
+window.addEventListener("offline", () => {
+  if (!state.authUser) return;
+  state.syncStatus = t("syncOffline");
+  updateAccountHeader();
+});
+window.addEventListener("focus", () => scheduleCloudSync(0));
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") scheduleCloudSync(0);
+});
 
 start();

@@ -26,7 +26,20 @@ export const strings = {
     chooseEvent: "முதலில் விசேஷத்தைத் தேர்வு செய்க", nothingToExport: "ஏற்றுமதி செய்ய பதிவுகள் இல்லை",
     namePlaceholder: "உதா: முருகன்", villagePlaceholder: "உதா: மதுரை", amountPlaceholder: "தொகையை உள்ளிடவும்",
     totalInEvent: "இந்த விசேஷ வரவு", netHint: "வரவு − செய்த மொய்", dragHint: "ஊரை இழுத்து வரிசையை மாற்றவும்",
-    printTip: "அச்சிடும் சாளரத்தில் “Save as PDF” தேர்வு செய்யவும்.", clearSearch: "அழி"
+    printTip: "அச்சிடும் சாளரத்தில் “Save as PDF” தேர்வு செய்யவும்.", clearSearch: "அழி",
+    login: "உள்நுழை", createAccount: "புதிய கணக்கு உருவாக்கு", email: "மின்னஞ்சல்", password: "கடவுச்சொல்",
+    forgotPassword: "கடவுச்சொல் மறந்துவிட்டதா?", signOut: "வெளியேறு", authRequired: "உங்கள் கணக்கில் உள்நுழையவும்",
+    firebaseSetup: "Firebase அமைப்பு தேவை. README-யில் உள்ள படிகளைப் பின்பற்றி firebase-config.js-ஐ நிரப்பவும்.",
+    authError: "உள்நுழைவு தோல்வியடைந்தது", resetSent: "கடவுச்சொல் மீட்டமைப்பு மின்னஞ்சல் அனுப்பப்பட்டது.",
+    syncReady: "Cloud ஒத்திசைக்கப்பட்டது", syncPending: "ஒத்திசைக்கிறது…", syncOffline: "இணையமில்லை · சாதனத்தில் சேமிக்கப்பட்டது",
+    accountMismatch: "இந்தச் சாதனம் வேறு Firebase கணக்குடன் இணைக்கப்பட்டுள்ளது. அதே கணக்கில் உள்நுழையவும்.",
+    adoptData: "இந்தச் சாதனத்தில் ஏற்கனவே உள்ள மொய் பதிவுகளை இப்போது உள்நுழையும் கணக்குடன் ஒத்திசைக்கவா?",
+    localOnly: "இந்தச் சாதனத்தில் உள்ள தரவு cloud கணக்குடன் ஒத்திசைக்கப்படும்.",
+    authEmailExists: "இந்த மின்னஞ்சலுக்கு ஏற்கனவே கணக்கு உள்ளது. உள்நுழையவும்.",
+    authWrongPassword: "மின்னஞ்சல் அல்லது கடவுச்சொல் சரியில்லை.",
+    authInvalidEmail: "சரியான மின்னஞ்சல் முகவரியை உள்ளிடவும்.",
+    authWeakPassword: "கடவுச்சொல் குறைந்தது 6 எழுத்துகள் இருக்க வேண்டும்.",
+    authNetwork: "இணைய இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்."
   },
   en: {
     appTitle: "MOI Ledger", events: "Events", entry: "Entry", balance: "Balance", villages: "Villages", settings: "Settings",
@@ -55,7 +68,20 @@ export const strings = {
     chooseEvent: "Select an event first", nothingToExport: "There are no records to export",
     namePlaceholder: "e.g. Murugan", villagePlaceholder: "e.g. Madurai", amountPlaceholder: "Enter amount",
     totalInEvent: "Received for this event", netHint: "Received − given", dragHint: "Drag villages to reorder",
-    printTip: "Choose “Save as PDF” in the print dialog.", clearSearch: "Clear"
+    printTip: "Choose “Save as PDF” in the print dialog.", clearSearch: "Clear",
+    login: "Sign in", createAccount: "Create account", email: "Email", password: "Password",
+    forgotPassword: "Forgot password?", signOut: "Sign out", authRequired: "Sign in to your account",
+    firebaseSetup: "Firebase setup is required. Follow the README steps and fill in firebase-config.js.",
+    authError: "Sign-in failed", resetSent: "Password reset email sent.",
+    syncReady: "Cloud synced", syncPending: "Syncing…", syncOffline: "Offline · saved on this device",
+    accountMismatch: "This device is linked to a different Firebase account. Sign in with that account.",
+    adoptData: "Sync the moi records already on this device to the account you are signing in to?",
+    localOnly: "Data stored on this device will sync with your cloud account.",
+    authEmailExists: "An account already exists for this email. Please sign in.",
+    authWrongPassword: "Email or password is incorrect.",
+    authInvalidEmail: "Enter a valid email address.",
+    authWeakPassword: "Password must be at least 6 characters.",
+    authNetwork: "Check your internet connection and try again."
   }
 };
 

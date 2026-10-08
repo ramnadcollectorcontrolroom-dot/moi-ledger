@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="auth-gate" class="auth-gate hidden" role="dialog" aria-modal="true" aria-labelledby="auth-title"></div>
   <div id="lock-screen" class="lock-screen hidden">
     <form id="unlock-form" class="lock-card">
       <div class="brand-mark">மொய்</div>
@@ -27,6 +28,8 @@
       <span><strong data-i18n="appTitle">மொய் கணக்கு</strong><small>MOI LEDGER</small></span>
     </a>
     <div class="top-actions">
+      <span id="account-email" class="account-email hidden"></span>
+      <button id="sign-out-button" class="icon-button hidden" type="button" data-i18n="signOut">வெளியேறு</button>
       <button id="quick-language" class="icon-button" type="button" aria-label="Change language">EN</button>
       <button id="install-button" class="icon-button hidden" type="button" data-i18n="install">நிறுவு</button>
     </div>
