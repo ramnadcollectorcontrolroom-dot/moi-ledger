@@ -145,19 +145,27 @@ async function mergeStore(firebaseSdk, bridge, uid, storeName, localRows, eventI
     }
   }
 
-  if (storeName === "events") {
+    if (storeName === "events") {
     const refreshedEvents = await bridge.localGetAll("events");
-  for (const event of refreshedEvents) {
-    if (event._syncId) {
-      resolvedEvents.set(event._syncId, event.id);
-    }
+
+    for (const event of refreshedEvents) {
+      if (event._syncId) {
+        resolvedEvents.set(event._syncId, event.id);
+      }
+
   }
 }
-  return resolvedEvents;
+  return resolvedEvents;syncAccount
 }
 
+
 export async function syncAccount(uid, localDatabase) {
+  if (!uid) {
+    throw new Error("User UID is missing. Please sign in again.");
+  }
+
   const firebaseSdk = await loadFirebase();
+
   const bridge = {
     localGetAll: localDatabase.getAll,
     localPut: localDatabase.put,
@@ -165,8 +173,23 @@ export async function syncAccount(uid, localDatabase) {
     getDeletes: localDatabase.getDeletes,
     clearDelete: localDatabase.clearDelete
   };
+
   let eventIds = new Map();
-  for (const storeName of ["events", "received", "given", "routes", "settings"]) {
-    eventIds = await mergeStore(firebaseSdk, bridge, uid, storeName, await bridge.localGetAll(storeName), eventIds);
+
+  for (const storeName of [
+    "events",
+    "received",
+    "given",
+    "routes",
+    "settings"
+  ]) {
+    eventIds = await mergeStore(
+      firebaseSdk,
+      bridge,
+      uid,
+      storeName,
+      await bridge.localGetAll(storeName),
+      eventIds
+    );
   }
 }
