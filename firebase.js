@@ -146,9 +146,13 @@ async function mergeStore(firebaseSdk, bridge, uid, storeName, localRows, eventI
   }
 
   if (storeName === "events") {
-    const refreshedEvents = await sdk.localGetAll("events");
-    for (const event of refreshedEvents) if (event._syncId) resolvedEvents.set(event._syncId, event.id);
+    const refreshedEvents = await bridge.localGetAll("events");
+  for (const event of refreshedEvents) {
+    if (event._syncId) {
+      resolvedEvents.set(event._syncId, event.id);
+    }
   }
+}
   return resolvedEvents;
 }
 
