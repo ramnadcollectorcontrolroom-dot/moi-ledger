@@ -154,7 +154,6 @@ async function mergeStore(firebaseSdk, bridge, uid, storeName, localRows, eventI
     }
   }
 }
-
 return resolvedEvents;
 }
 
